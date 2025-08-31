@@ -1,38 +1,43 @@
-import os, json
-import sys
+from api_request import get_profile, get_balance, APIError
+from datetime import datetime
 
-from api_request import *
-from ui import *
+def get_user_data(tokens: dict) -> dict:
+    """
+    Fetches user profile and balance using the provided tokens.
+    This function is designed for use in a web context.
+    """
+    if not tokens or "access_token" not in tokens or "id_token" not in tokens:
+        raise APIError("Invalid or missing tokens.")
 
-def load_token():
-    if os.path.exists("tokens.json"):
-        with open("tokens.json", "r", encoding="utf8") as f:
-            tokens = json.load(f)
-        print("Tokens loaded successfully.")
+    id_token = tokens.get("id_token")
+    access_token = tokens.get("access_token")
+
+    try:
+        profile_data = get_profile(access_token, id_token)
+        if not profile_data or "profile" not in profile_data:
+            raise APIError("Failed to parse profile data.")
         
-        refresh_token = tokens.get("refresh_token")
-        tokens = get_new_token(refresh_token)
+        phone_number = profile_data.get("profile", {}).get("msisdn")
+
+        balance_data = get_balance(id_token)
+        balance_remaining = balance_data.get("remaining")
+        balance_expired_at_ts = balance_data.get("expired_at")
         
-        id_token = tokens.get("id_token")
-        access_token = tokens.get("access_token")
-        
-        profile = get_profile(access_token, id_token)
-        if not profile:
-            print("Failed to fetch profile. Please check your tokens.")
-            sys.exit(1)
-        
-        phone_number = profile.get("profile").get("msisdn")
-        
-        balance = get_balance(id_token)
-        balance_remaining = balance.get("remaining")
-        balance_expired_at = balance.get("expired_at")
-        
+        # Convert timestamp to a readable string
+        if balance_expired_at_ts:
+            balance_expired_at = datetime.fromtimestamp(balance_expired_at_ts).strftime("%d %B %Y")
+        else:
+            balance_expired_at = "N/A"
+
         return {
-            "tokens": tokens,
             "is_logged_in": True,
             "phone_number": phone_number,
             "balance": balance_remaining,
             "balance_expired_at": balance_expired_at,
         }
-    
-    return None
+    except APIError as e:
+        # Re-raise the APIError to be handled by the Flask route
+        raise e
+    except Exception as e:
+        # Catch any other unexpected errors
+        raise APIError(f"An unexpected error occurred while fetching user data: {e}")
