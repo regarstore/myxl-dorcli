@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Purchase - Regar Store Panel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        Confirm Purchase
+    </div>
+    <div class="card-body">
+        {% if package %}
+            <h5 class="card-title">{{ package.title }}</h5>
+            <p class="card-text"><strong>Price:</strong> Rp {{ "{:,.0f}".format(package.price) }}</p>
+            <div class="mb-3">
+                <strong>Details & TnC:</strong>
+                <div class="p-2 bg-light border rounded" style="font-size: 0.9rem; max-height: 200px; overflow-y: auto;">
+                    {{ package.detail|safe }}
+                </div>
+            </div>
+            <p class="text-danger">Please ensure you have sufficient balance before proceeding.</p>
+            <form action="{{ url_for('confirm_purchase', package_code=package.code) }}" method="post">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-success">Confirm Purchase</button>
+                </div>
+            </form>
+        {% else %}
+            <p class="text-danger">Could not load package details. Please try again.</p>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Back to Dashboard</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

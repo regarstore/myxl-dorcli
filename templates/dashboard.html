@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Regar Store Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">Dashboard</h4>
+    <div>
+        {% if session.user_data.is_admin %}
+            <a href="{{ url_for('admin_panel') }}" class="btn btn-sm btn-warning">Admin Panel</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        Account Information
+    </div>
+    <div class="card-body">
+        {% if user_data %}
+            <p><strong>Phone Number:</strong> {{ user_data.phone_number }}</p>
+            <p><strong>Your Balance:</strong> Rp {{ "{:,.0f}".format(user_data.balance) if user_data.balance is not none else '0' }}</p>
+        {% else %}
+            <p class="text-danger">Could not load user information.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Available Packages (XUT)
+    </div>
+    <div class="card-body">
+        {% if packages %}
+            <div class="list-group">
+                {% for pkg in packages %}
+                    <a href="{{ url_for('purchase_package_page', package_code=pkg.code) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ pkg.name }}</h6>
+                            <small>Rp {{ "{:,.0f}".format(pkg.admin_price if pkg.admin_price is not none else pkg.price) }}</small>
+                        </div>
+                        <button class="btn btn-primary btn-sm">Purchase</button>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted">No packages available at the moment, or there was an error fetching them.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
