@@ -5,15 +5,22 @@ import time
 import logging
 from datetime import datetime, timezone, timedelta
 
+# Import the new crypto helper functions
 from crypto_helper import (
-    encryptsign_xdata, java_like_timestamp, ts_gmt7_without_colon,
-    ax_api_signature, decrypt_xdata, API_KEY, make_x_signature_payment,
+    encryptsign_xdata,
+    decrypt_xdata,
+    ax_api_signature,
+    get_x_signature_payment,
+    java_like_timestamp,
+    ts_gmt7_without_colon,
     build_encrypted_field
 )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Use the new API key provided by the user
+NEW_API_KEY = "de588d51-47bf-4af0-8522-649c4456d0fe"
 BASE_URL = "https://api.myxl.xlaxiata.co.id"
 
 class APIError(Exception):
@@ -79,7 +86,9 @@ def submit_otp(contact: str, code: str) -> dict:
     now_gmt7 = datetime.now(timezone(timedelta(hours=7)))
     ts_for_sign = ts_gmt7_without_colon(now_gmt7)
     ts_header = ts_gmt7_without_colon(now_gmt7 - timedelta(minutes=5))
-    signature = ax_api_signature(ts_for_sign, contact, code, "SMS")
+
+    # Use the new ax_api_signature function
+    signature = ax_api_signature(NEW_API_KEY, ts_for_sign, contact, code, "SMS")
 
     payload = f"contactType=SMS&code={code}&grant_type=password&contact={contact}&scope=openid"
     headers = {
@@ -116,7 +125,9 @@ def submit_otp(contact: str, code: str) -> dict:
 
 def send_api_request(path: str, payload_dict: dict, id_token: str, method: str = "POST") -> dict:
     """Sends a signed and encrypted request to the MyXL API."""
-    encrypted_payload = encryptsign_xdata(method=method, path=path, id_token=id_token, payload=payload_dict)
+    encrypted_payload = encryptsign_xdata(
+        api_key=NEW_API_KEY, method=method, path=path, id_token=id_token, payload=payload_dict
+    )
     
     xtime = int(encrypted_payload["encrypted_body"]["xtime"])
     now = datetime.now(timezone.utc).astimezone()
@@ -128,7 +139,7 @@ def send_api_request(path: str, payload_dict: dict, id_token: str, method: str =
         "host": "api.myxl.xlaxiata.co.id",
         "content-type": "application/json; charset=utf-8",
         "user-agent": "myXL / 8.6.0(1179); com.android.vending; (samsung; SM-N935F; SDK 33; Android 13)",
-        "x-api-key": API_KEY,
+        "x-api-key": "vT8tINqHaOxXbGE7eOWAhA==", # This seems to be a static key for the header
         "authorization": f"Bearer {id_token}",
         "x-hv": "v3",
         "x-signature-time": str(sig_time_sec),
@@ -143,7 +154,7 @@ def send_api_request(path: str, payload_dict: dict, id_token: str, method: str =
     try:
         resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=30)
         resp.raise_for_status()
-        decrypted_body = decrypt_xdata(resp.json())
+        decrypted_body = decrypt_xdata(api_key=NEW_API_KEY, encrypted_payload=resp.json())
         return decrypted_body
     except requests.RequestException as e:
         logging.error(f"API request to {url} failed: {e}")
@@ -207,7 +218,9 @@ def send_payment_request(payload_dict: dict, access_token: str, id_token: str, t
     path = "payments/api/v8/settlement-balance"
     package_code = payload_dict["items"][0]["item_code"]
     
-    encrypted_payload = encryptsign_xdata(method="POST", path=path, id_token=id_token, payload=payload_dict)
+    encrypted_payload = encryptsign_xdata(
+        api_key=NEW_API_KEY, method="POST", path=path, id_token=id_token, payload=payload_dict
+    )
     
     xtime = int(encrypted_payload["encrypted_body"]["xtime"])
     sig_time_sec = (xtime // 1000)
@@ -215,13 +228,22 @@ def send_payment_request(payload_dict: dict, access_token: str, id_token: str, t
     payload_dict["timestamp"] = ts_to_sign
     
     body = encrypted_payload["encrypted_body"]
-    x_sig2 = make_x_signature_payment(access_token, ts_to_sign, package_code, token_payment)
+
+    # Replace make_x_signature_payment with the new function
+    x_sig2 = get_x_signature_payment(
+        api_key=NEW_API_KEY,
+        access_token=access_token,
+        sig_time_sec=ts_to_sign,
+        package_code=package_code,
+        token_payment=token_payment,
+        payment_method="BALANCE"
+    )
     
     headers = {
         "host": "api.myxl.xlaxiata.co.id",
         "content-type": "application/json; charset=utf-8",
         "user-agent": "myXL / 8.6.0(1179); com.android.vending; (samsung; SM-N935F; SDK 33; Android 13)",
-        "x-api-key": API_KEY,
+        "x-api-key": "vT8tINqHaOxXbGE7eOWAhA==",
         "authorization": f"Bearer {id_token}",
         "x-hv": "v3",
         "x-signature-time": str(sig_time_sec),
@@ -236,7 +258,7 @@ def send_payment_request(payload_dict: dict, access_token: str, id_token: str, t
     try:
         resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=30)
         resp.raise_for_status()
-        decrypted_body = decrypt_xdata(resp.json())
+        decrypted_body = decrypt_xdata(api_key=NEW_API_KEY, encrypted_payload=resp.json())
         return decrypted_body
     except requests.RequestException as e:
         logging.error(f"Payment request to {url} failed: {e}")
