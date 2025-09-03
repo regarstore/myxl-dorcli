@@ -4,20 +4,18 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
 API_KEY = "vT8tINqHaOxXbGE7eOWAhA=="
-AX_API_SIG_KEY_ASCII = b"18b4d589826af50241177961590e6693"
 
-XDATA_ENCRYPT_URL = "https://myxldecrypt.fuyuki.pw/encrypt"
-XDATA_DECRYPT_URL = "https://myxldecrypt.fuyuki.pw/decrypt"
-XDATA_ENCRYPT_SIGN_URL = "https://myxldecrypt.fuyuki.pw/encryptsign"
+XDATA_DECRYPT_URL = "https://crypto.mashu.lol/api/decrypt"
+XDATA_ENCRYPT_SIGN_URL = "https://crypto.mashu.lol/api/encryptsign"
+PAYMENT_SIGN_URL = "https://crypto.mashu.lol/api/sign-payment"
+BOUNTY_SIGN_URL = "https://crypto.mashu.lol/api/sign-bounty"
+AX_SIGN_URL = "https://crypto.mashu.lol/api/sign-ax"
 
 AES_KEY_ASCII = "5dccbf08920a5527"
 BLOCK = AES.block_size
 
 def random_iv_hex16() -> str:
     return os.urandom(8).hex()
-
-def _xor(data: bytes, key: bytes) -> bytes:
-    return bytes([b ^ key[i % len(key)] for i, b in enumerate(data)])
 
 def b64(data: bytes, urlsafe: bool) -> str:
     enc = base64.urlsafe_b64encode if urlsafe else base64.b64encode
@@ -59,13 +57,33 @@ def ts_gmt7_without_colon(dt: datetime) -> str:
     tz = dt.strftime("%z")
     return dt.strftime(f"%Y-%m-%dT%H:%M:%S.{millis}") + tz
 
-def ax_api_signature(ts_for_sign: str, contact: str, code: str, contact_type: str) -> str:
-    preimage = f"{ts_for_sign}password{contact_type}{contact}{code}openid"
-    digest = hmac.new(AX_API_SIG_KEY_ASCII, preimage.encode("utf-8"), hashlib.sha256).digest()
-    b64res = base64.b64encode(digest).decode("ascii")
-    return b64res
+def ax_api_signature(
+        api_key: str,
+        ts_for_sign: str,
+        contact: str,
+        code: str,
+        contact_type: str
+    ) -> str:
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+    }
+
+    request_body = {
+        "ts_for_sign": ts_for_sign,
+        "contact": contact,
+        "code": code,
+        "contact_type": contact_type
+    }
+
+    response = requests.request("POST", AX_SIGN_URL, json=request_body, headers=headers, timeout=30)
+    if response.status_code == 200:
+        return response.json().get("ax_signature")
+    else:
+        raise Exception(f"Signature generation failed: {response.text}")
     
 def encryptsign_xdata(
+        api_key: str,
         method: str,
         path: str,
         id_token: str,
@@ -73,6 +91,7 @@ def encryptsign_xdata(
     ) -> str:
     headers = {
         "Content-Type": "application/json",
+        "x-api-key": api_key,
     }
     
     request_body = {
@@ -89,12 +108,16 @@ def encryptsign_xdata(
     else:
         raise Exception(f"Encryption failed: {response.text}")
     
-def decrypt_xdata(encrypted_payload: dict) -> dict:
+def decrypt_xdata(
+    api_key: str,
+    encrypted_payload: dict
+    ) -> dict:
     if not isinstance(encrypted_payload, dict) or "xdata" not in encrypted_payload or "xtime" not in encrypted_payload:
         raise ValueError("Invalid encrypted data format. Expected a dictionary with 'xdata' and 'xtime' keys.")
     
     headers = {
         "Content-Type": "application/json",
+        "x-api-key": api_key,
     }
     
     response = requests.request("POST", XDATA_DECRYPT_URL, json=encrypted_payload, headers=headers, timeout=30)
@@ -104,17 +127,55 @@ def decrypt_xdata(encrypted_payload: dict) -> dict:
     else:
         raise Exception(f"Decryption failed: {response.text}")
 
-def make_x_signature_payment(access_token: str, sig_time_sec: int, package_code: str, token_payment:str) -> str:
-    k = b"KRw1fXkLSwZLCU52GiEaNRsXFnURAhUUAH9MFmZZK2gPRDAIBjkMEBYdQkoWYmh2YhQCBEIKLDRbGR0zAk1OV2dXCEUzAz9THSsGGDwgbzVvYR9fQERbcgIxcB1aEh4rEB85dXRjdVsJQgM5DxAUOh4mdS9helFqd1VDRmA2AyMYKBoTE24YPWFLXUdpF2RGJGYhRnggDF0KGDE/FgUVZmFjd3ogKFo+DAkaPlY5PEoXWA4BQ0Y1JCVGPgwJGmAbOSBCVk1TFUtQNS0="
+def get_x_signature_payment(
+        api_key: str,
+        access_token: str,
+        sig_time_sec: int,
+        package_code: str,
+        token_payment: str,
+        payment_method: str
+    ) -> str:
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+    }
 
-    xor_key = b"MyXL#8.6.0#API#Sign"
+    request_body = {
+        "access_token": access_token,
+        "sig_time_sec": sig_time_sec,
+        "package_code": package_code,
+        "token_payment": token_payment,
+        "payment_method": payment_method
+    }
 
-    cipher_bytes = base64.b64decode(k)
-    template = _xor(cipher_bytes, xor_key).decode("utf-8")
+    response = requests.request("POST", PAYMENT_SIGN_URL, json=request_body, headers=headers, timeout=30)
 
-    key_str = template.format(st=sig_time_sec)
-    key_bytes = key_str.encode("utf-8")
+    if response.status_code == 200:
+        return response.json().get("x_signature")
+    else:
+        raise Exception(f"Signature generation failed: {response.text}")
 
-    msg = f"{access_token};{token_payment};{sig_time_sec};BUY_PACKAGE;BALANCE;{package_code};".encode("utf-8")
+def get_x_signature_bounty(
+        api_key: str,
+        access_token: str,
+        sig_time_sec: int,
+        package_code: str,
+        token_payment: str
+    ) -> str:
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+    }
 
-    return hmac.new(key_bytes, msg, hashlib.sha512).hexdigest()
+    request_body = {
+        "access_token": access_token,
+        "sig_time_sec": sig_time_sec,
+        "package_code": package_code,
+        "token_payment": token_payment
+    }
+
+    response = requests.request("POST", BOUNTY_SIGN_URL, json=request_body, headers=headers, timeout=30)
+    if response.status_code == 200:
+        return response.json().get("x_signature")
+    else:
+        raise Exception(f"Signature generation failed: {response.text}")

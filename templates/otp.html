@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Enter OTP - Regar Store Panel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body p-4">
+        <h5 class="card-title text-center mb-4">Enter OTP</h5>
+        <p class="text-center text-muted">An OTP has been sent to <strong>{{ phone_number }}</strong>. Please enter it below.</p>
+        <form action="{{ url_for('otp') }}" method="post">
+            <input type="hidden" name="phone_number" value="{{ phone_number }}">
+            <div class="mb-3">
+                <label for="otp_code" class="form-label">OTP Code</label>
+                <input type="text" class="form-control" id="otp_code" name="otp_code" required minlength="6" maxlength="6" pattern="\d{6}">
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Verify & Login</button>
+            </div>
+        </form>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('login') }}">Change number?</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

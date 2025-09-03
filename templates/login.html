@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Regar Store Panel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body p-4">
+        <h5 class="card-title text-center mb-4">Login</h5>
+        <form action="{{ url_for('login') }}" method="post">
+            <div class="mb-3">
+                <label for="phone_number" class="form-label">Phone Number</label>
+                <input type="text" class="form-control" id="phone_number" name="phone_number" placeholder="e.g., 6281234567890" required>
+                <div class="form-text">Enter your XL phone number starting with 62.</div>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Request OTP</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

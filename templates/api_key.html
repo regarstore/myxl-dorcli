@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Enter API Key - Regar Store Panel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body p-4">
+        <h5 class="card-title text-center mb-4">Enter Your API Key</h5>
+        <p class="text-center text-muted">Please provide your API key to continue.</p>
+        <form action="{{ url_for('save_key') }}" method="post">
+            <div class="mb-3">
+                <label for="api_key" class="form-label">API Key</label>
+                <input type="text" class="form-control" id="api_key" name="api_key" placeholder="Enter your API key" required>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Save Key & Continue</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
